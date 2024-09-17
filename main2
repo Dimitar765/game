@@ -1,0 +1,261 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Player struct {
+	Name   string
+	Score  int
+	Health int
+	Spells []string
+}
+
+type Question struct {
+	Epoch    string
+	Question string
+	Choices  []string
+	Correct  int
+}
+
+type Creature struct {
+	Name   string
+	Health int
+}
+
+var player Player
+
+func askMultipleChoiceQuestion(q Question, player *Player) bool {
+	fmt.Println(q.Question)
+	for i, choice := range q.Choices {
+		fmt.Printf("%d. %s\n", i+1, choice)
+	}
+	fmt.Print("> ")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	choice, err := strconv.Atoi(input)
+	if err != nil || choice < 1 || choice > len(q.Choices) {
+		color.Red("Invalid choice. Please choose a number between 1 and %d.", len(q.Choices))
+		return false
+	}
+
+	if choice-1 == q.Correct {
+		color.Green("Correct!")
+		return true
+	} else {
+		color.Red("Incorrect. The correct answer was: %s", q.Choices[q.Correct])
+		return false
+	}
+}
+
+func printProgressBar(currentStage, totalStages int) {
+	percentage := int(float64(currentStage) / float64(totalStages) * 100)
+	barLength := 50
+	filledLength := int(float64(percentage) / 100.0 * float64(barLength))
+	bar := "[" + strings.Repeat("=", filledLength) + strings.Repeat(" ", barLength-filledLength) + "]"
+	fmt.Printf("\r%s %d%%", bar, percentage)
+}
+
+func clearScreen() {
+	fmt.Print("\033[H\033[2J") // ANSI escape code to clear the terminal screen
+}
+
+func displayArt() {
+	fmt.Println(`
+   _____ _            _        _        
+  / ____| |          | |      | |       
+ | |    | | ___   ___| | _____| |_ ___   
+ | |    | |/ _ \ / __| |/ / _ \ __/ _ \  
+ | |____| | (_) | (__|   <  __/ || (_) | 
+  \_____|_|\___/ \___|_|\_\___|\__\___/  
+  `)
+}
+
+func mazeStage(stage int) bool {
+	fmt.Printf("You are at Maze Stage %d. Answer the question to proceed.\n", stage)
+
+	questions := []Question{
+		{Epoch: "Maze", Question: "Who was the king of the Greek gods?", Choices: []string{"Hades", "Zeus", "Apollo", "Ares"}, Correct: 1},
+		{Epoch: "Maze", Question: "What is the name of Thor's hammer?", Choices: []string{"Stormbreaker", "Mjolnir", "Gungnir", "Excalibur"}, Correct: 1},
+		{Epoch: "Maze", Question: "Who is the goddess of wisdom in Greek mythology?", Choices: []string{"Aphrodite", "Athena", "Hera", "Artemis"}, Correct: 1},
+	}
+
+	return askMultipleChoiceQuestion(questions[stage-1], &player)
+}
+
+func battle(creature Creature) {
+	color.Cyan("You encounter a %s with %d health!", creature.Name, creature.Health)
+
+	for creature.Health > 0 && player.Health > 0 {
+		fmt.Println("\nChoose a spell:")
+		for i, spell := range player.Spells {
+			fmt.Printf("%d. %s\n", i+1, spell)
+		}
+
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("> ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		choice, err := strconv.Atoi(input)
+		if err != nil || choice < 1 || choice > len(player.Spells) {
+			color.Red("Invalid choice.")
+			continue
+		}
+
+		var damage int
+		switch choice {
+		case 1: // Attack
+			damage = rand.Intn(20) + 5 // Random attack damage
+			color.Green("You cast %s and deal %d damage!", player.Spells[0], damage)
+			creature.Health -= damage
+		case 2: // Defense
+			defense := rand.Intn(10) + 5
+			color.Blue("You cast %s and block %d damage!", player.Spells[1], defense)
+		case 3: // Heal
+			heal := rand.Intn(15) + 5
+			player.Health += heal
+			color.Magenta("You cast %s and heal for %d health!", player.Spells[2], heal)
+		default:
+			color.Yellow("You cast %s, a powerful new spell!", player.Spells[choice-1])
+			// Example new spell effect
+			damage = rand.Intn(25) + 10
+			color.Green("You deal %d damage with %s!", damage, player.Spells[choice-1])
+			creature.Health -= damage
+		}
+
+		// Display creature's remaining health
+		if creature.Health > 0 {
+			color.Yellow("The %s has %d health remaining.", creature.Name, creature.Health)
+			// Creature attacks back
+			creatureDamage := rand.Intn(15) + 5
+			color.Red("The %s attacks and deals %d damage!", creature.Name, creatureDamage)
+			player.Health -= creatureDamage
+		} else {
+			color.Green("The %s has been defeated!", creature.Name)
+		}
+
+		// Display player's health
+		color.Cyan("You have %d health remaining.", player.Health)
+
+		// Optional: Add a short delay to make the game feel more dynamic
+		time.Sleep(1 * time.Second)
+	}
+
+	if player.Health > 0 {
+		color.Green("You defeated the creature!")
+	} else {
+		color.Red("You were defeated by the creature...")
+	}
+}
+
+func startBattlePhase() {
+	clearScreen()
+	displayArt()
+
+	color.Cyan("You answered 7 or more questions correctly! Now, you face a mythological creature.")
+
+	player.Health = 100
+	player.Spells = []string{"Attack", "Defense", "Heal"}
+
+	creature := Creature{Name: "Minotaur", Health: 50}
+	totalStages := 3
+
+	for stage := 1; stage <= totalStages; stage++ {
+		fmt.Printf("\n--- Maze Stage %d ---\n", stage)
+		success := mazeStage(stage)
+
+		// Update progress bar
+		clearScreen()
+		displayArt()
+		fmt.Printf("Maze Progress: ")
+		printProgressBar(stage, totalStages)
+
+		if success {
+			color.Green("\nYou answered correctly and earned a new spell!")
+			newSpells := []string{"Fireball", "Lightning Strike", "Earthquake"}
+			if stage-1 < len(newSpells) {
+				player.Spells = append(player.Spells, newSpells[stage-1])
+				color.Cyan("New spell acquired: %s", newSpells[stage-1])
+			}
+		} else {
+			color.Yellow("You failed the maze stage. Proceeding to the next stage without a new spell.")
+		}
+		fmt.Println() // Move to the next line after progress bar
+		time.Sleep(1 * time.Second)
+	}
+
+	// Battle phase
+	clearScreen()
+	displayArt()
+	battle(creature)
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "historygame",
+	Short: "A CLI-based history knowledge game",
+	Long:  "A simple Go CLI game to test your knowledge of history across different epochs and face mythological creatures.",
+	Run: func(cmd *cobra.Command, args []string) {
+		color.Cyan("Welcome to the History Knowledge Game!")
+		color.Yellow("Use the 'start' command to begin the game or 'score' to check your current score.")
+	},
+}
+
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start a new game",
+	Run: func(cmd *cobra.Command, args []string) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter your name: ")
+		player.Name, _ = reader.ReadString('\n')
+		player.Name = strings.TrimSpace(player.Name)
+		player.Score = 0
+
+		clearScreen()
+		displayArt()
+
+		color.Cyan("Choose a door:")
+		color.Green("1 - Ancient History")
+		fmt.Print("> ")
+
+		doorChoice, _ := reader.ReadString('\n')
+		doorChoice = strings.TrimSpace(doorChoice)
+
+		switch doorChoice {
+		case "1":
+			startBattlePhase()
+		default:
+			color.Red("Invalid choice. Game over.")
+		}
+	},
+}
+
+var scoreCmd = &cobra.Command{
+	Use:   "score",
+	Short: "Check your current score",
+	Run: func(cmd *cobra.Command, args []string) {
+		color.Cyan("%s's current score: %d", player.Name, player.Score)
+	},
+}
+
+func main() {
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(scoreCmd)
+
+	rand.Seed(time.Now().UnixNano())
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println("Error executing command:", err)
+		os.Exit(1)
+	}
+}

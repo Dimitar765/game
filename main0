@@ -1,0 +1,229 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+)
+
+// Struct for the player
+type Player struct {
+	Name   string
+	Score  int
+	Health int
+	Spells []string
+}
+
+// Struct for questions with multiple-choice options
+type Question struct {
+	Epoch    string
+	Question string
+	Choices  []string
+	Correct  int // Index of the correct answer in Choices
+}
+
+// Global player instance
+var player Player
+
+// Struct for the battle creature
+type Creature struct {
+	Name   string
+	Health int
+}
+
+// Function to ask a multiple-choice question and check the answer
+func askMultipleChoiceQuestion(q Question, player *Player) bool {
+	fmt.Println(q.Question)
+	for i, choice := range q.Choices {
+		fmt.Printf("%d. %s\n", i+1, choice)
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("> ")
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	answerIndex := strings.TrimSpace(input)
+	switch answerIndex {
+	case "1", "2", "3", "4":
+		answerIndex := int(answerIndex[0] - '1')
+		if answerIndex == q.Correct {
+			fmt.Println("Correct!")
+			return true
+		} else {
+			fmt.Printf("Incorrect. The correct answer was: %s\n", q.Choices[q.Correct])
+		}
+	default:
+		fmt.Println("Invalid input. Please choose a number between 1 and 4.")
+	}
+	return false
+}
+
+// Function to navigate through a stage of the maze
+func mazeStage(stage int) bool {
+	fmt.Printf("You are at Maze Stage %d. Answer the question to proceed.\n", stage)
+
+	// Define a question for each stage of the maze
+	questions := []Question{
+		{Epoch: "Maze", Question: "Who was the king of the Greek gods?", Choices: []string{"Hades", "Zeus", "Apollo", "Ares"}, Correct: 1},
+		{Epoch: "Maze", Question: "What is the name of Thor's hammer?", Choices: []string{"Stormbreaker", "Mjolnir", "Gungnir", "Excalibur"}, Correct: 1},
+		{Epoch: "Maze", Question: "Who is the goddess of wisdom in Greek mythology?", Choices: []string{"Aphrodite", "Athena", "Hera", "Artemis"}, Correct: 1},
+	}
+
+	return askMultipleChoiceQuestion(questions[stage-1], &player)
+}
+
+// Function to handle the battle with a creature
+
+func battle(creature Creature) {
+	fmt.Printf("You encounter a %s with %d health!\n", creature.Name, creature.Health)
+
+	for creature.Health > 0 && player.Health > 0 {
+		fmt.Println("\nChoose a spell:")
+		for i, spell := range player.Spells {
+			fmt.Printf("%d. %s\n", i+1, spell)
+		}
+
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("> ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		choice, err := strconv.Atoi(input)
+		if err != nil || choice < 1 || choice > len(player.Spells) {
+			fmt.Println("Invalid choice.")
+			continue
+		}
+
+		// Use the chosen spell
+		switch choice {
+		case 1: // Attack
+			damage := rand.Intn(20) + 5 // Random attack damage
+			fmt.Printf("You cast %s and deal %d damage!\n", player.Spells[0], damage)
+			creature.Health -= damage
+		case 2: // Defense
+			defense := rand.Intn(10) + 5
+			fmt.Printf("You cast %s and block %d damage!\n", player.Spells[1], defense)
+		case 3: // Heal
+			heal := rand.Intn(15) + 5
+			player.Health += heal
+			fmt.Printf("You cast %s and heal for %d health!\n", player.Spells[2], heal)
+		default:
+			fmt.Printf("You cast %s, a powerful new spell!\n", player.Spells[choice-1])
+			// You can add more logic here for new spells like "Fireball", "Lightning Strike", etc.
+		}
+
+		// Creature attacks back
+		if creature.Health > 0 {
+			creatureDamage := rand.Intn(15) + 5
+			fmt.Printf("The %s attacks and deals %d damage!\n", creature.Name, creatureDamage)
+			player.Health -= creatureDamage
+		}
+	}
+
+	if player.Health > 0 {
+		fmt.Println("You defeated the creature!")
+	} else {
+		fmt.Println("You were defeated by the creature...")
+	}
+}
+
+// Function to handle the mythological battle phase
+func startBattlePhase() {
+	fmt.Println("You answered 7 or more questions correctly! Now, you face a mythological creature.")
+
+	// Initialize player stats
+	player.Health = 100
+	player.Spells = []string{"Attack", "Defense", "Heal"}
+
+	// Define the mythological creature
+	creature := Creature{Name: "Minotaur", Health: 50}
+
+	// Navigate the three-stage maze
+	for stage := 1; stage <= 3; stage++ {
+		success := mazeStage(stage)
+		if success {
+			fmt.Println("You answered correctly and earned a new spell!")
+			// Add a new spell
+			newSpells := []string{"Fireball", "Lightning Strike", "Earthquake"}
+			if stage-1 < len(newSpells) {
+				player.Spells = append(player.Spells, newSpells[stage-1])
+				fmt.Printf("New spell acquired: %s\n", newSpells[stage-1])
+			}
+		} else {
+			fmt.Println("You failed the maze stage. Proceeding to the battle without a new spell.")
+		}
+	}
+
+	// Start the battle with the creature
+	battle(creature)
+}
+
+// Root command: Main entry point
+var rootCmd = &cobra.Command{
+	Use:   "historygame",
+	Short: "A CLI-based history knowledge game",
+	Long:  "A simple Go CLI game to test your knowledge of history across different epochs and face mythological creatures.",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Welcome to the History Knowledge Game!")
+		fmt.Println("Use the 'start' command to begin the game or 'score' to check your current score.")
+	},
+}
+
+// Start command: To start a new game
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start a new game",
+	Run: func(cmd *cobra.Command, args []string) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter your name: ")
+		player.Name, _ = reader.ReadString('\n')
+		player.Name = strings.TrimSpace(player.Name)
+		player.Score = 0 // Reset the score at the start of a new game
+
+		fmt.Println("Choose a door:")
+		fmt.Println("1 - Ancient History")
+		// Future: You can add Medieval and Modern epochs here
+		fmt.Print("> ")
+
+		doorChoice, _ := reader.ReadString('\n')
+		doorChoice = strings.TrimSpace(doorChoice)
+
+		switch doorChoice {
+		case "1":
+			// Assume the player does well and gets 7 or more correct answers
+			startBattlePhase()
+		default:
+			fmt.Println("Invalid choice. Game over.")
+		}
+	},
+}
+
+// Score command: To check the current score
+var scoreCmd = &cobra.Command{
+	Use:   "score",
+	Short: "Check your current score",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("%s's current score: %d\n", player.Name, player.Score)
+	},
+}
+
+func main() {
+	// Add commands to the root command
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(scoreCmd)
+
+	// Seed random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Execute the root command (this starts the game)
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}

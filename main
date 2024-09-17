@@ -1,0 +1,136 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+// Struct for the player
+type Player struct {
+	Name  string
+	Score int
+}
+
+// Struct for questions with multiple-choice options
+type Question struct {
+	Epoch    string
+	Question string
+	Choices  []string
+	Correct  int // Index of the correct answer in Choices
+}
+
+var player Player
+
+// Function to ask a multiple-choice question and check the answer
+func askMultipleChoiceQuestion(q Question, player *Player) {
+	fmt.Println(q.Question)
+	for i, choice := range q.Choices {
+		fmt.Printf("%d. %s\n", i+1, choice)
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("> ")
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	// Convert the player's answer to an integer index
+	answerIndex := strings.TrimSpace(input)
+	switch answerIndex {
+	case "1", "2", "3", "4":
+		answerIndex := int(answerIndex[0] - '1')
+		if answerIndex == q.Correct {
+			fmt.Println("Correct!")
+			player.Score++
+		} else {
+			fmt.Printf("Incorrect. The correct answer was: %s\n", q.Choices[q.Correct])
+		}
+	default:
+		fmt.Println("Invalid input. Please choose a number between 1 and 4.")
+	}
+}
+
+// Function to start the Ancient History quiz
+func startAncientQuiz(player *Player) {
+	// Define the Ancient History questions with multiple choices
+	questions := []Question{
+		{Epoch: "Ancient", Question: "Who was the first emperor of Rome?", Choices: []string{"Julius Caesar", "Augustus", "Nero", "Tiberius"}, Correct: 1},
+		{Epoch: "Ancient", Question: "Which civilization built the pyramids?", Choices: []string{"Mesopotamians", "Romans", "Greeks", "Egyptians"}, Correct: 3},
+		{Epoch: "Ancient", Question: "Who was the Greek god of war?", Choices: []string{"Apollo", "Ares", "Zeus", "Hermes"}, Correct: 1},
+		{Epoch: "Ancient", Question: "What was the name of Alexander the Great's horse?", Choices: []string{"Bucephalus", "Pegasus", "Shadowfax", "Epona"}, Correct: 0},
+		{Epoch: "Ancient", Question: "In which city was the famous Hanging Gardens located?", Choices: []string{"Athens", "Babylon", "Carthage", "Alexandria"}, Correct: 1},
+		{Epoch: "Ancient", Question: "Which famous battle did 300 Spartans fight in?", Choices: []string{"Marathon", "Salamis", "Thermopylae", "Plataea"}, Correct: 2},
+		{Epoch: "Ancient", Question: "What was the main language of the Roman Empire?", Choices: []string{"Latin", "Greek", "Coptic", "Hebrew"}, Correct: 0},
+		{Epoch: "Ancient", Question: "Who was the founder of the Persian Empire?", Choices: []string{"Xerxes", "Cyrus the Great", "Darius", "Artaxerxes"}, Correct: 1},
+		{Epoch: "Ancient", Question: "What is the name of the Roman god of the sea?", Choices: []string{"Poseidon", "Neptune", "Hades", "Mars"}, Correct: 1},
+		{Epoch: "Ancient", Question: "What was the primary building material of the Colosseum?", Choices: []string{"Marble", "Concrete", "Granite", "Limestone"}, Correct: 1},
+	}
+
+	fmt.Println("Welcome to the Ancient History quiz!")
+	for _, q := range questions {
+		askMultipleChoiceQuestion(q, player)
+	}
+	fmt.Printf("You finished the Ancient History quiz. Your score: %d/10\n", player.Score)
+}
+
+// Root command: Main entry point
+var rootCmd = &cobra.Command{
+	Use:   "historygame",
+	Short: "A CLI-based history knowledge game",
+	Long:  "A simple Go CLI game to test your knowledge of history across different epochs.",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Welcome to the History Knowledge Game!")
+		fmt.Println("Use the 'start' command to begin the game or 'score' to check your current score.")
+	},
+}
+
+// Start command: To start a new game
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start a new game",
+	Run: func(cmd *cobra.Command, args []string) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter your name: ")
+		player.Name, _ = reader.ReadString('\n')
+		player.Name = strings.TrimSpace(player.Name)
+		player.Score = 0 // Reset the score at the start of a new game
+
+		fmt.Println("Choose a door:")
+		fmt.Println("1 - Ancient History")
+		// Future: You can add Medieval and Modern epochs here
+		fmt.Print("> ")
+
+		doorChoice, _ := reader.ReadString('\n')
+		doorChoice = strings.TrimSpace(doorChoice)
+
+		switch doorChoice {
+		case "1":
+			startAncientQuiz(&player)
+		default:
+			fmt.Println("Invalid choice. Game over.")
+		}
+	},
+}
+
+// Score command: To check the current score
+var scoreCmd = &cobra.Command{
+	Use:   "score",
+	Short: "Check your current score",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("%s's current score: %d\n", player.Name, player.Score)
+	},
+}
+
+func main() {
+	// Add commands to the root command
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(scoreCmd)
+
+	// Execute the root command (this starts the game)
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
